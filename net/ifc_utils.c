@@ -36,12 +36,18 @@
 
 static int ifc_ctl_sock = -1;
 
-static char *ipaddr_to_string(uint32_t addr)
+static char *ipaddr_to_string(uint32_t addr, char *dest)
 {
     struct in_addr in_addr;
-
     in_addr.s_addr = addr;
-    return inet_ntoa(in_addr);
+	unsigned char *a = (void *)&in_addr;
+
+	if(dest == NULL)
+		return NULL;
+	
+	snprintf(dest, 16 * sizeof(char), "%d.%d.%d.%d", a[0], a[1], a[2], a[3]);
+	
+	return dest;
 }
 
 /*only supply for ipv4*/
@@ -135,17 +141,19 @@ int ifc_set_mask(const char *name, const char *mask)
 int ifc_get_info(const char *name, char *addr, char *mask, unsigned *flags)
 {
     struct ifreq ifr;
+
+	ifc_init();
     ifc_init_ifr(name, &ifr);
 	
 	in_addr_t iaddr, imask;
-
+	
     if (addr != NULL) {
         if(ioctl(ifc_ctl_sock, SIOCGIFADDR, &ifr) < 0) {
             iaddr = 0;
         } else {
             iaddr = ((struct sockaddr_in*) &ifr.ifr_addr)->sin_addr.s_addr;
         }
-		addr = ipaddr_to_string(iaddr);
+		ipaddr_to_string(iaddr, addr);
     }
     
     if (mask != NULL) {
@@ -154,9 +162,9 @@ int ifc_get_info(const char *name, char *addr, char *mask, unsigned *flags)
         } else {
             imask = ((struct sockaddr_in*) &ifr.ifr_addr)->sin_addr.s_addr;
         }
-		mask = ipaddr_to_string(imask);
+		ipaddr_to_string(imask, mask);
     }
-
+	
     if (flags != NULL) {
         if(ioctl(ifc_ctl_sock, SIOCGIFFLAGS, &ifr) < 0) {
             *flags = 0;
@@ -164,6 +172,8 @@ int ifc_get_info(const char *name, char *addr, char *mask, unsigned *flags)
             *flags = ifr.ifr_flags;
         }
     }
+
+	ifc_close();
 
     return 0;
 }
@@ -306,7 +316,7 @@ int ifc_get_default_route(const char *ifname, char *gateway)
                 && dest == 0
                 && strcmp(ifname, name) == 0) {
             result = gway;
-			gateway = ipaddr_to_string(gway);
+			ipaddr_to_string(gway, gateway);
             break;
         }
     }
@@ -390,7 +400,7 @@ int ifc_get_dns(char *dns)
 	if(fp == NULL)
 		return errno;
 
-	ret = fscanf(fp, "%s %s", buf, dns);
+	ret = fscanf(fp, "%s%s", buf, dns);
 	if(ret < 0)
 		return errno;
 	
@@ -446,7 +456,33 @@ ifc_configure(const char *ifname,
     return 0;
 }
 
+#if 0
 main()
 {
-	puts("test");
+	int ret = 1;
+		
+	//ret = ifc_configure("eth0", "10.0.20.120", "255.255.255.0", "10.0.20.1", "10.10.0.2");
+	if(ret < 0)
+		fprintf(stderr, "error on ifc_configure\n");
+
+	char addr[16], mask[16], gway[16], dns[16];
+	char *p = NULL;
+
+	memset(addr, 0, 16);
+	memset(mask, 0, 16);
+	memset(gway, 0, 16);
+	memset(dns, 0, 16);
+	
+	if(ifc_get_info("eth0", addr, mask, NULL) != 0)
+		fprintf(stderr, "error on get info\n");
+
+	if(ifc_get_default_route("eth0", gway) <= 0)
+		fprintf(stderr, "error on get gway\n");
+
+	if(ifc_get_dns(dns) < 0)
+		fprintf(stderr, "error on get dns\n");
+
+	fprintf(stderr, "addr:%s\nmask:%s\ngway:%s\ndns:%s\n", addr, mask, gway, dns);
 }
+
+#endif
