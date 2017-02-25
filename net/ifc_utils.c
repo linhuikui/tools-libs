@@ -38,16 +38,13 @@ static int ifc_ctl_sock = -1;
 
 static char *ipaddr_to_string(uint32_t addr, char *dest)
 {
-    struct in_addr in_addr;
-    in_addr.s_addr = addr;
-	unsigned char *a = (void *)&in_addr;
-
-	if(dest == NULL)
-		return NULL;
+	sprintf(dest,"%d.%d.%d.%d",
+            addr & 255,
+            ((addr >> 8) & 255),
+            ((addr >> 16) & 255),
+            (addr >> 24));
 	
-	snprintf(dest, 16 * sizeof(char), "%d.%d.%d.%d", a[0], a[1], a[2], a[3]);
-	
-	return dest;
+    return dest;
 }
 
 /*only supply for ipv4*/
